@@ -1,0 +1,128 @@
+- name: "Installing Webserver and dependecies"
+  yum:
+    name: "{{ packages_web }}"
+  vars:
+    packages_web:
+    - httpd
+    - php
+    - php-mysqlnd
+    - php-pdo
+    - mod_ssl
+    - openssl
+    - mod_security
+    - mod_evasive
+  tags:
+    - web
+
+- name: "Enable service httpd, and restart"
+  service:
+    name: httpd
+    enabled: yes
+    state: restarted
+  tags:
+    - web
+
+- name: "Applying firewall rule for http"
+  firewalld:
+    service: http
+    permanent: yes
+    state: enabled
+  tags:
+    - fw
+
+- name: "Applying firewall rule for https"
+  firewalld:
+    service: https
+    permanent: yes
+    state: enabled
+  tags:
+    - fw
+
+- name: "Restarting firewalld to reload configs"
+  service:
+    name: firewalld
+    enabled: yes
+    state: restarted
+  tags:
+    - fw
+
+- name: "Copy file httpd.conf"
+  copy: 
+    src: files/httpd.conf
+    dest: /etc/httpd/conf/httpd.conf
+    owner: root
+    group: root
+    mode: 0644
+  tags:
+    - configfiles
+
+- name: "Copy file ssl.conf"
+  copy: 
+    src: files/ssl.conf
+    dest: /etc/httpd/conf.d/ssl.conf
+    owner: root
+    group: root
+    mode: 0644
+  tags:
+    - configfiles
+
+- name: "Copy file 00-base.conf"
+  copy: 
+    src: files/00-base.conf
+    dest: /etc/httpd/conf.modules.d/00-base.conf
+    owner: root
+    group: root
+    mode: 0644
+  tags:
+    - configfiles
+
+- name: "Copy file ca.crt"
+  copy: 
+    src: files/ca.crt
+    dest: /etc/pki/tls/certs/ca.crt
+    owner: root
+    group: root
+    mode: 0644
+  tags:
+    - configfiles
+
+- name: "Copy file ca.key"
+  copy: 
+    src: files/ca.key
+    dest: /etc/pki/tls/private/ca.key
+    owner: root
+    group: root
+    mode: 0644
+  tags:
+    - configfiles
+
+- name: "Copy file ca.csr"
+  copy: 
+    src: files/ca.csr
+    dest: /etc/pki/tls/private/ca.csr
+    owner: root
+    group: root
+    mode: 0644
+  tags:
+    - configfiles
+
+- name: "Remove autoindex file"
+  file:
+    state: absent
+    path: /etc/httpd/conf.d/autoindex.conf
+  tags:
+    - configfiles
+
+- name: "Restart httpd service"
+  service:
+    name: httpd
+    state: restarted
+  tags:
+    - configfiles
+
+- name: "Extract web files"
+  unarchive:
+    src: files/web.tar.gz
+    dest: /var/www/html
+  tags:
+    - webfiles

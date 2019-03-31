@@ -1,0 +1,30 @@
+- name: "Installing Database"
+  yum:
+    name: "{{ packages_db }}"
+  vars:
+    packages_db:
+    - mariadb-server
+    - mariadb
+  tags:
+    - db
+
+- name: "Enable/restart MariaDB service"
+  service:
+    name: mariadb
+    enabled: yes
+    state: restarted
+  tags:
+    - web
+
+- name: "Copy SQL file smallwebapp.sql"
+  copy: 
+    src: files/smallwebapp.sql
+    dest: /tmp/smallwebapp.sql
+    mode: 0644
+  tags:
+    - dbadmin
+
+- name: "Import/execute SQL file"
+  shell: mysql -u root < /tmp/smallwebapp.sql
+  tags:
+    - dbadmin

@@ -1,0 +1,8 @@
+---
+
+- hosts: aws
+  become: yes
+  roles:
+    - yum
+    - db
+    - web
