@@ -1,0 +1,13 @@
+[local]
+localhost
+
+[awsdb]
+
+[awsweb]
+
+[webserver]
+
+[dbserver]
+
+
+

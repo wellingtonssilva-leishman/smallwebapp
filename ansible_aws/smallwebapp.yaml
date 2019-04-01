@@ -1,0 +1,27 @@
+- name: Add user keys to DB server
+  hosts: awsdb
+  remote_user: centos
+  roles:
+    - keys
+
+- name: Add user keys to WEB server(s)
+  hosts: awsweb
+  remote_user: centos
+  roles:
+    - keys
+
+- name: Install DB environment
+  hosts: awsdb
+  become: yes
+  remote_user: centos
+  roles:
+    - yum
+    - db
+
+- name: Install WEB environment
+  hosts: awsweb
+  become: yes
+  remote_user: centos
+  roles:
+    - yum
+    - web

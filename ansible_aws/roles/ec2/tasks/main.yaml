@@ -1,0 +1,161 @@
+- name: "Create DB security group"
+  ec2_group:
+    name: "SG_DB_{{ aws_group }}"
+    description: DB Security Group
+    aws_access_key: "{{ aws_access }}"
+    aws_secret_key: "{{ aws_secret }}"
+    region: "{{ aws_region }}"
+    rules:
+      - proto: tcp # SSH
+        from_port: 22
+        to_port: 22
+        cidr_ip: 0.0.0.0/0
+      - proto: tcp  # MySQL
+        from_port: 3306
+        to_port: 3306
+        cidr_ip: "{{ aws_cidr }}"
+    rules_egress:
+      - proto: all
+        cidr_ip: 0.0.0.0/0
+  register: db_security_group
+
+- name: "Create ec2 db instance"
+  ec2:
+    aws_access_key: "{{ aws_access }}"
+    aws_secret_key: "{{ aws_secret }}"
+    region: "{{ aws_region }}"
+    key_name: "{{ aws_ssh_key }}"
+    group_id: "{{ db_security_group.group_id }}"
+    instance_type: "{{ aws_instance_type }}"
+    image: "{{ aws_ami }}"
+    wait: true
+    vpc_subnet_id: "{{ aws_subnet }}"
+    assign_public_ip: yes
+    instance_tags:
+      Name: SmallWebDB
+    exact_count: 1
+    count_tag:
+        Name: smallwebdb
+  register: ec2_db
+
+- name: "Add db server internal ip to hosts file"
+  lineinfile:
+    dest: "{{ hostpath }}"
+    insertafter: '\[dbserver\]'
+    line: "{{ item.private_ip }}" 
+    state: present
+  with_items: "{{ ec2_db.instances }}"
+
+- name: "Add db server public ip to hosts file"
+  lineinfile:
+    dest: "{{ hostpath }}"
+    insertafter: '\[awsdb\]'
+    line: "{{ item.public_ip }} {{hoststring}}"
+    state: present
+  with_items: "{{ ec2_db.instances }}"
+
+- name: "Wait for SSH to come up"
+  local_action: wait_for 
+                host={{ item.public_ip }} 
+                port=22 
+                state=started
+  with_items: "{{ ec2_db.instances }}"
+
+- name: "Create the ELB only listening over port 80/443"
+  ec2_elb_lb:
+    name: smallwebapp-load-balancer
+    state: present
+    aws_access_key: "{{ aws_access }}"
+    aws_secret_key: "{{ aws_secret }}"
+    region: "{{ aws_region }}"
+    zones:
+      - "{{ aws_region }}a"
+      - "{{ aws_region }}b"
+    listeners:
+      - protocol: http # options are http, https, ssl, tcp
+        load_balancer_port: 80
+        instance_port: 80
+        proxy_protocol: True
+  register: elb
+
+- name: "Create web security group"
+  ec2_group:
+    name: "SG_WEB_{{ aws_group }}"
+    description: Web Security Group
+    aws_access_key: "{{ aws_access }}"
+    aws_secret_key: "{{ aws_secret }}"
+    region: "{{ aws_region }}"
+    rules:
+      - proto: tcp # SSH
+        from_port: 22
+        to_port: 22
+        cidr_ip: 0.0.0.0/0
+      - proto: tcp
+        from_port: 80 # HTTP
+        to_port: 80
+        cidr_ip: 0.0.0.0/0
+      - proto: tcp  # HTTPS
+        from_port: 443
+        to_port: 443
+        cidr_ip: 0.0.0.0/0
+    rules_egress:
+      - proto: all
+        cidr_ip: 0.0.0.0/0
+  register: web_security_group
+
+- name: "Create ec2 web instance(s)"
+  ec2:
+    aws_access_key: "{{ aws_access }}"
+    aws_secret_key: "{{ aws_secret }}"
+    region: "{{ aws_region }}"
+    key_name: "{{ aws_ssh_key }}"
+    group_id: 
+      - "{{ web_security_group.group_id }}"
+      - "{{ elb.elb.security_group_ids | first }}"
+    instance_type: "{{ aws_instance_type }}"
+    image: "{{ aws_ami }}"
+    wait: true
+    vpc_subnet_id: "{{ aws_subnet }}"
+    assign_public_ip: yes
+    instance_tags:
+      Name: SmallWebApp
+    exact_count: 2
+    count_tag:
+        Name: smallwebapp
+  register: ec2_web
+
+- name: "Add web server(s) private ip to hosts file"
+  lineinfile:
+    dest: "{{ hostpath }}"
+    insertafter: '\[webserver\]'
+    line: "{{ item.private_ip }}"
+    state: present
+  with_items : "{{ ec2_web.instances }}"
+
+- name: "Add web server(s) public ip to hosts file"
+  lineinfile:
+    dest: "{{ hostpath }}"
+    insertafter: '\[awsweb\]'
+    line: "{{ item.public_ip }} {{hoststring}}"
+    state: present
+  with_items: "{{ ec2_web.instances }}"
+
+- name: "Wait for SSH to come up"
+  local_action: wait_for 
+                host={{ item.public_ip }} 
+                port=22 
+                state=started
+  with_items: "{{ ec2_web.instances }}"
+
+- name: "Add each EC2 instance to the ELB"
+  ec2_elb:
+    state: present
+    ec2_elbs: smallwebapp-load-balancer
+    wait: no
+    aws_access_key: "{{ aws_access }}"
+    aws_secret_key: "{{ aws_secret }}"
+    region: "{{ aws_region }}"
+    instance_id: "{{ item.id }}"
+  with_items: "{{ ec2_web.instances }}"
+  tags:
+    - lbadd

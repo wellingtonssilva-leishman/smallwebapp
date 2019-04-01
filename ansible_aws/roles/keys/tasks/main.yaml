@@ -1,0 +1,5 @@
+- name: "Add public keys for user"
+  authorized_key:
+    user: centos
+    state: present
+    key: "{{ lookup('file', './files/id_rsa.pub') }}"

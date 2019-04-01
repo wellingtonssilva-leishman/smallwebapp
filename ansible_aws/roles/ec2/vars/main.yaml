@@ -1,0 +1,12 @@
+# vars file
+aws_access: ""
+aws_secret: ""
+aws_region: "us-east-2"
+aws_ssh_key: "<pemfilename>"
+aws_group: "swa"
+aws_cidr: ""
+aws_subnet: ""
+aws_ami: "ami-0f2b4fc905b0bd1f1"
+aws_instance_type: "t2.micro"
+hostpath: "./hosts"
+hoststring: "ansible_ssh_user=centos ansible_ssh_private_key_file=./<pemfilename>.pem"

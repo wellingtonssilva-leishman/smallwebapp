@@ -1,0 +1,15 @@
+- name: "Install EPEL Release"
+  yum: name=epel-release state=latest
+  tags:
+    - yummgmt
+
+- name: "yum update all on {{inventory_hostname}}"
+  yum: name='*' state=latest
+  tags:
+    - yummgmt
+
+- name: "Installing Firewalld"
+  yum:
+    name: firewalld
+  tags:
+    - firewall
